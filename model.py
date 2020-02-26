@@ -4,6 +4,7 @@ import itertools
 
 from tqdm import tqdm
 import numpy as np
+import scipy
 import networkx as nx
 from sklearn.metrics.pairwise import cosine_similarity
 import torch.nn as nn
@@ -16,7 +17,7 @@ def indicator_func(e):
 
 
 class GDConcept:
-    def __init__(self, tolerence, alpha, concept_num):
+    def __init__(self, tolerence, concept_num, alpha=None):
         super(GDConcept, self).__init__()
         self.tolerence = tolerence
         self.alpha = alpha
@@ -34,8 +35,8 @@ class GDConcept:
         return sum_f
 
     # get C_opt
-    def _inference_C(self, alpha, seq, cliques):
-        sum_f = self._get_sum_of_feature(seq, cliques)
+    def _inference_C(self, alpha, sum_f):
+        # sum_f = self._get_sum_of_feature(seq, cliques)
         c_opt = (alpha - 1 + sum_f) / sum(alpha - 1 + sum_f)
 
         return c_opt
@@ -51,11 +52,51 @@ class GDConcept:
 
         return cliques
 
+    def _alpha_estimation(self, input_data, sum_f_list):
+        print('estimating alpha')
+        thresh = 0.1
+        diff = 1
+        alpha = np.full((self.concept_num, 1), 1, dtype='float')
+        sum_f_arr = np.array(sum_f_list)
+        while diff > thresh:
+            old_alpha = np.copy(alpha)
+            for t in range(self.concept_num):
+                # numerator_sum, denominator_sum = 0, 0
+                # for n in range(len(input_data)):
+                #     tmp1 = scipy.special.digamma(old_alpha[t] + sum_f_list[n][t]) - scipy.special.digamma(old_alpha[t])
+                #     tmp2 = scipy.special.digamma(sum(old_alpha + sum_f_list[n])) - scipy.special.digamma(sum(old_alpha))
+                #
+                #     numerator_sum += tmp1
+                #     denominator_sum += tmp2
+
+                tmp1 = sum(scipy.special.digamma(old_alpha[t] + sum_f_arr[:, t, :]) - scipy.special.digamma(old_alpha[t]))
+                tmp2 = sum(scipy.special.digamma(sum(old_alpha) + np.sum(sum_f_arr, axis=1)) - scipy.special.digamma(sum(old_alpha)))
+
+                alpha[t] = old_alpha[t] * tmp1 / tmp2
+
+            diff = abs(sum(alpha) - sum(old_alpha))
+            print(diff)
+
+        return alpha
+
+
+
     def inference(self, input_data):
-        C = []
+        clique_list = []
+        sum_f_list = []
         for idx, seq in enumerate(tqdm(input_data)):
             seq_cliques = self._clique_detection(seq)
-            c_opt = self._inference_C(self.alpha, seq, seq_cliques)
+            sum_f = self._get_sum_of_feature(seq, seq_cliques)
+
+            clique_list.append(seq_cliques)
+            sum_f_list.append(sum_f)
+
+        if not self.alpha:
+            self.alpha = self. _alpha_estimation(input_data, sum_f_list)
+
+        C = []
+        for idx, seq in enumerate(tqdm(input_data)):
+            c_opt = self._inference_C(self.alpha, sum_f_list[idx])
             C.append(c_opt)
 
         # print(C)
@@ -66,9 +107,9 @@ class GDConcept:
 def run():
     tolerence = 0
     concept_num = 100
-    input_data = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(200)]
-    alpha = np.full((concept_num, 1), 1)
-    model = GDConcept(tolerence, alpha, concept_num)
+    input_data = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(20)]
+    # alpha = np.full((concept_num, 1), 1)
+    model = GDConcept(tolerence, concept_num)
     model.inference(input_data)
 
 
