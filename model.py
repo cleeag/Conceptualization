@@ -2,6 +2,7 @@ import os
 from os.path import join
 import itertools
 
+from tqdm import tqdm
 import numpy as np
 import networkx as nx
 from sklearn.metrics.pairwise import cosine_similarity
@@ -47,16 +48,17 @@ class GDConcept:
             if cosine_similarity(seq[comb[0]].reshape(1, -1), seq[comb[1]].reshape(1, -1)) > self.tolerence:
                 G.add_edge(comb, 1)
         cliques = nx.find_cliques(G)
+
         return cliques
 
-    def inference(self, feats):
+    def inference(self, input_data):
         C = []
-        for idx, seq in enumerate(feats):
+        for idx, seq in enumerate(tqdm(input_data)):
             seq_cliques = self._clique_detection(seq)
             c_opt = self._inference_C(self.alpha, seq, seq_cliques)
             C.append(c_opt)
 
-        print(C)
+        # print(C)
         return C
 
 
@@ -64,10 +66,10 @@ class GDConcept:
 def run():
     tolerence = 0
     concept_num = 100
-    feats = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(20)]
+    input_data = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(2000)]
     alpha = np.full((concept_num, 1), 1)
     model = GDConcept(tolerence, alpha, concept_num)
-    model.inference(feats)
+    model.inference(input_data)
 
 
 if __name__ == '__main__':
