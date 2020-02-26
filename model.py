@@ -66,7 +66,7 @@ class GDConcept:
 def run():
     tolerence = 0
     concept_num = 100
-    input_data = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(2000)]
+    input_data = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(200)]
     alpha = np.full((concept_num, 1), 1)
     model = GDConcept(tolerence, alpha, concept_num)
     model.inference(input_data)
