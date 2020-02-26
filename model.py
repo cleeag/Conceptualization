@@ -35,9 +35,8 @@ class GDConcept:
         return sum_f
 
     # get C_opt
-    def _inference_C(self, alpha, sum_f):
-        # sum_f = self._get_sum_of_feature(seq, cliques)
-        c_opt = (alpha - 1 + sum_f) / sum(alpha - 1 + sum_f)
+    def _inference_C(self, sum_f):
+        c_opt = (self.alpha - 1 + sum_f) / sum(self.alpha - 1 + sum_f)
 
         return c_opt
 
@@ -65,12 +64,15 @@ class GDConcept:
                 # for n in range(len(input_data)):
                 #     tmp1 = scipy.special.digamma(old_alpha[t] + sum_f_list[n][t]) - scipy.special.digamma(old_alpha[t])
                 #     tmp2 = scipy.special.digamma(sum(old_alpha + sum_f_list[n])) - scipy.special.digamma(sum(old_alpha))
-                #
                 #     numerator_sum += tmp1
                 #     denominator_sum += tmp2
 
-                tmp1 = sum(scipy.special.digamma(old_alpha[t] + sum_f_arr[:, t, :]) - scipy.special.digamma(old_alpha[t]))
-                tmp2 = sum(scipy.special.digamma(sum(old_alpha) + np.sum(sum_f_arr, axis=1)) - scipy.special.digamma(sum(old_alpha)))
+                tmp1 = sum(
+                    scipy.special.digamma(old_alpha[t] + sum_f_arr[:, t, :])
+                    - scipy.special.digamma(old_alpha[t]))
+                tmp2 = sum(
+                    scipy.special.digamma(sum(old_alpha) + np.sum(sum_f_arr, axis=1))
+                    - scipy.special.digamma(sum(old_alpha)))
 
                 alpha[t] = old_alpha[t] * tmp1 / tmp2
 
@@ -78,8 +80,6 @@ class GDConcept:
             print(diff)
 
         return alpha
-
-
 
     def inference(self, input_data):
         clique_list = []
@@ -92,16 +92,15 @@ class GDConcept:
             sum_f_list.append(sum_f)
 
         if not self.alpha:
-            self.alpha = self. _alpha_estimation(sum_f_list)
+            self.alpha = self._alpha_estimation(sum_f_list)
 
         C = []
         for idx, seq in enumerate(tqdm(input_data)):
-            c_opt = self._inference_C(self.alpha, sum_f_list[idx])
+            c_opt = self._inference_C(sum_f_list[idx])
             C.append(c_opt)
 
         print(C[0])
         return C
-
 
 
 def run():
