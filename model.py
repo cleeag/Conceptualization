@@ -52,10 +52,10 @@ class GDConcept:
 
         return cliques
 
-    def _alpha_estimation(self, input_data, sum_f_list):
+    def _alpha_estimation(self, sum_f_list):
         print('estimating alpha')
-        thresh = 0.1
-        diff = 1
+        thresh = 5
+        diff = 100
         alpha = np.full((self.concept_num, 1), 1, dtype='float')
         sum_f_arr = np.array(sum_f_list)
         while diff > thresh:
@@ -92,14 +92,14 @@ class GDConcept:
             sum_f_list.append(sum_f)
 
         if not self.alpha:
-            self.alpha = self. _alpha_estimation(input_data, sum_f_list)
+            self.alpha = self. _alpha_estimation(sum_f_list)
 
         C = []
         for idx, seq in enumerate(tqdm(input_data)):
             c_opt = self._inference_C(self.alpha, sum_f_list[idx])
             C.append(c_opt)
 
-        # print(C)
+        print(C[0])
         return C
 
 
