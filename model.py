@@ -1,19 +1,17 @@
 import os
 from os.path import join
 import itertools
-
+import pickle as pkl
+from scipy.sparse import *
 from tqdm import tqdm
 import numpy as np
 import scipy
+
 import networkx as nx
 from sklearn.metrics.pairwise import cosine_similarity
 import torch.nn as nn
 
-
-def indicator_func(e):
-    indicator = np.zeros((len(e), 1))
-    indicator[np.argwhere(e > 0), 1] = 1
-    return indicator
+from utils import read_data, co_occurence_lookup
 
 
 class GDConcept:
@@ -25,28 +23,38 @@ class GDConcept:
 
     # get sum of feature function
     def _get_sum_of_feature(self, seq, cliques):
-        sum_f = np.zeros((self.concept_num, 1))
+        print('getting sum of features')
+        sum_f = csc_matrix((self.concept_num, 1))
         for clique in cliques:
             if len(clique) == 1: continue
             E_k = seq[clique[1], :]
             E_k[E_k > 0] = 1
-            sum_f += np.multiply(np.prod(E_k, axis=0), np.sum(E_k, axis=0)).reshape(-1, 1)
+            tmp0 = np.prod(E_k.toarray(), axis=0)
+            tmp1 = csc_matrix(tmp0)
+            tmp2 = E_k.sum(axis=0)
+            sum_f += tmp1.multiply(tmp2).reshape(-1, 1)
+            # sum_f += np.multiply(tmp1, tmp2).reshape(-1, 1)
+            # sum_f += np.multiply(np.prod(E_k, axis=0), np.sum(E_k, axis=0)).reshape(-1, 1)
 
         return sum_f
 
     # get C_opt
     def _inference_C(self, sum_f):
+        print('inferencing C')
         c_opt = (self.alpha - 1 + sum_f) / sum(self.alpha - 1 + sum_f)
 
         return c_opt
 
     # get cliques in sequence
     def _clique_detection(self, seq):
+        print('detecting cliques...')
         G = nx.Graph()
-        G.add_nodes_from(range(len(seq)))
-        for comb in itertools.combinations(range(len(seq)), 2):
-            if cosine_similarity(seq[comb[0]].reshape(1, -1), seq[comb[1]].reshape(1, -1)) > self.tolerence:
+        G.add_nodes_from(range(seq.shape[0]))
+        for comb in itertools.combinations(range(seq.shape[0]), 2):
+            cos = cosine_similarity(seq[comb[0]].reshape(1, -1), seq[comb[1]].reshape(1, -1))
+            if  cos > self.tolerence:
                 G.add_edge(comb, 1)
+        print('nx finding cliques')
         cliques = nx.find_cliques(G)
 
         return cliques
@@ -91,7 +99,7 @@ class GDConcept:
             clique_list.append(seq_cliques)
             sum_f_list.append(sum_f)
 
-        if not self.alpha:
+        if self.alpha is None:
             self.alpha = self._alpha_estimation(sum_f_list)
 
         C = []
@@ -105,10 +113,24 @@ class GDConcept:
 
 def run():
     tolerence = 0
-    concept_num = 100
-    input_data = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(20)]
-    # alpha = np.full((concept_num, 1), 1)
-    model = GDConcept(tolerence, concept_num)
+    concept_num = 2359855
+    instance_num = 6215859
+    # input_data = [np.random.randint(20, size=(np.random.randint(3, 15), concept_num)) for _ in range(20)]
+    alpha = np.full((concept_num, 1), 1)
+    # alpha = csc_matrix((concept_num, 1))
+    # alpha = None
+    test_data = '/home/data/cleeag/conceptualization/test_data.txt'
+    co_path = '/home/data/cleeag/conceptualization/short-text-conceptualization/conceptInstanceFile'
+    co_matrix_path = '/home/data/cleeag/conceptualization/co_matrix.pkl'
+    inst2idx_path = '/home/data/cleeag/conceptualization/short-text-conceptualization/instanceFile'
+    inst2idx_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict.pkl'
+
+    raw_data = read_data(test_data)
+    input_data = co_occurence_lookup(raw_data, concept_num, instance_num,
+                                     co_path=co_path, co_matrix_path=co_matrix_path,
+                                     inst2idx_path=inst2idx_path, inst2idx_dict_path=inst2idx_dict_path)
+
+    model = GDConcept(tolerence, concept_num, alpha=alpha)
     model.inference(input_data)
 
 
