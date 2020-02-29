@@ -76,7 +76,7 @@ def check_dict(inst2idx_dict_path):
         print(idx2concept_dict.get(key, 'not found'))
 
 
-def inspect_result(raw_data, idx2concept_dict, result_path, output_path):
+def export_result_file(raw_data, idx2concept_dict, result_path, output_path):
     C = pkl.load(file=open(result_path, 'rb'))
     with open(output_path, 'w') as w:
         for idx, c_opt in enumerate(C):

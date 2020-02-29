@@ -12,7 +12,7 @@ import networkx as nx
 from sklearn.metrics.pairwise import cosine_similarity
 import torch.nn as nn
 
-from utils import read_data, co_occurence_lookup, inspect_result
+from utils import read_data, co_occurence_lookup, export_result_file
 
 
 class GDConcept:
@@ -66,6 +66,7 @@ class GDConcept:
             tmp2 = seq[clique[1], :].sum(axis=0)
             sum_f += tmp1.multiply(tmp2).reshape(-1, 1)
 
+        # one vertex clique
         for i in range(seq.shape[0]):
             E_k = seq[i, :]
             E_k[E_k > 0] = 1
@@ -140,9 +141,9 @@ def run():
                                                        inst2idx_dict_path=inst2idx_dict_path,
                                                        idx2concept_dict_path=idx2concept_dict_path)
 
-    # model = GDConcept(tolerence, concept_num, alpha=alpha)
-    # C = model.inference(input_data, C_result_path)
-    inspect_result(raw_data, idx2concept_dict, C_result_path, result_path)
+    model = GDConcept(tolerence, concept_num, alpha=alpha)
+    C = model.inference(input_data, C_result_path)
+    export_result_file(raw_data, idx2concept_dict, C_result_path, result_path)
 
 
 if __name__ == '__main__':
