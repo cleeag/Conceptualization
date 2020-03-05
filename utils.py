@@ -10,6 +10,8 @@ import json
 
 import inflect
 
+black_list = ['it', 'hi', 'a', 'the', 'wa']
+
 
 def read_data(path):
     data = []
@@ -24,7 +26,7 @@ def read_ufet_data(path):
     with open(path, 'r') as r:
         count = 0
         for i, line in enumerate(r):
-            if count >= 50: break
+            if count >= 100: break
             example = json.loads(line.strip())
             # line = example['left_context_token'] + example['mention_span'].split() + example['right_context_token']
             line = example['mention_span'].split()
@@ -75,9 +77,17 @@ def co_occurence_lookup(data,
         inst2idx_dict = defaultdict(dict)
         with open(join(raw_file_dir_path, 'instanceFile'), 'r') as r:
             for i, line in enumerate(tqdm(r)):
-                instance, idx = line.lower().split('\t')
+                instance, idx = line.split('\t')
                 instance = tuple(instance.lower().split())
-                inst2idx_dict[instance[0]][instance] = int(idx)
+                if instance[0] in inst2idx_dict:
+                    if instance in inst2idx_dict[instance[0]]:
+                        inst2idx_dict[instance[0]][instance].append(int(idx))
+                    else:
+                        inst2idx_dict[instance[0]][instance] = [int(idx)]
+                else:
+                    inst2idx_dict[instance[0]][instance] = [int(idx)]
+
+                if i == 0: print(inst2idx_dict)
 
         pkl.dump(inst2idx_dict, file=open(inst2idx_dict_path, 'wb'), )
     else:
@@ -95,8 +105,7 @@ def co_occurence_lookup(data,
         print('loading idx2concept_dict...')
         idx2concept_dict = pkl.load(file=open(idx2concept_dict_path, 'rb'))
 
-    vec_data = []
-    term_data = []
+    vec_data, term_data, sent_data = [], [], []
     p = inflect.engine()
     for line in data:
         tmp = []
@@ -128,51 +137,43 @@ def co_occurence_lookup(data,
                             if len(term) >= max_len:
                                 max_len = len(term)
                                 candidate_dict[max_len] = term
-                    if len(candidate_dict) > 0:
+                    if len(candidate_dict) == 0 or (
+                            candidate_dict[max_len][0] in black_list and len(candidate_dict) == 1):
+                        i += 1
+                    elif len(candidate_dict) > 0:
                         term = candidate_dict[max_len]
-                        print(term, line)
                         idx = inst2idx_dict[word][term]
-                        tmp.append([co_matrix[:, idx].T])
+                        print(idx, term, line)
+                        occ_vec = csc_matrix(co_matrix[:, idx].sum(axis=1).T)
+                        # tmp.append([co_matrix[:, idx].T])
+                        tmp.append([occ_vec])
                         term_tmp.append(term)
                         i += max_len
-                    else:
-                        i += 1
                 else:
                     i += 1
         if len(tmp) > 0:
             tmp = bmat(tmp, format='csc')
             vec_data.append(tmp)
+            sent_data.append(line)
             term_data.append(term_tmp)
-        if len(vec_data) > 20:
-            print("done loading data")
-            break
-    print(term_data)
 
-    return vec_data, term_data, idx2concept_dict
+    return vec_data, sent_data, term_data, idx2concept_dict
 
-
-def check_dict(inst2idx_dict_path):
-    idx2concept_dict = pkl.load(file=open(inst2idx_dict_path, 'rb'))
-    while True:
-        key = input('please input key\n')
-        print(idx2concept_dict.get(key, 'not found'))
 
 
 if __name__ == '__main__':
     test_data = '/home/data/cleeag/conceptualization/test_data.txt'
     raw_file_dir_path = '/home/data/cleeag/conceptualization/short-text-conceptualization'
     co_matrix_path = '/home/data/cleeag/conceptualization/co_matrix.pkl'
-    inst2idx_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict.pkl'
+    # inst2idx_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict.pkl'
+    inst2idx_simple_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict-simple.pkl'
     idx2concept_dict_path = '/home/data/cleeag/conceptualization/idx2concept_dict.pkl'
     concept_num = 2359855
     instance_num = 6215859
 
-    # check_dict(inst2idx_dict_path)
-    # sys.exit()
-
     raw_data = read_data(test_data)
-    input_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
-                                                       raw_file_dir_path=raw_file_dir_path,
-                                                       co_matrix_path=co_matrix_path,
-                                                       inst2idx_dict_path=inst2idx_dict_path,
-                                                       idx2concept_dict_path=idx2concept_dict_path)
+    vec_data, sent_data, term_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
+                                                                           raw_file_dir_path=raw_file_dir_path,
+                                                                           co_matrix_path=co_matrix_path,
+                                                                           inst2idx_dict_path=inst2idx_dict_path,
+                                                                           idx2concept_dict_path=idx2concept_dict_path)

@@ -139,7 +139,7 @@ def run():
     tic = time.time()
     # raw_data = read_data(test_data)
     raw_data = read_ufet_data(test_data)
-    input_data, term_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
+    input_data, sent_data, term_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
                                                                   raw_file_dir_path=raw_file_dir_path,
                                                                   co_matrix_path=co_matrix_path,
                                                                   inst2idx_dict_path=inst2idx_dict_path,
@@ -147,7 +147,7 @@ def run():
 
     model = GDConcept(tolerence, concept_num, alpha=alpha)
     C = model.inference(input_data, C_result_path)
-    export_result_file(raw_data, term_data, idx2concept_dict, C_result_path, result_path)
+    export_result_file(sent_data, term_data, idx2concept_dict, C_result_path, result_path)
     toc = time.time()
 
     print(f'total run-time: {toc - tic:.1f}s')
