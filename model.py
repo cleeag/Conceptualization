@@ -2,17 +2,18 @@ import os
 from os.path import join
 import itertools
 import pickle as pkl
-from scipy.sparse import *
+from scipy.sparse import csc_matrix
 from tqdm import tqdm
 import numpy as np
 import scipy
 import csv
+import time
 
 import networkx as nx
 from sklearn.metrics.pairwise import cosine_similarity
 import torch.nn as nn
 
-from utils import read_data, co_occurence_lookup, export_result_file
+from utils import read_data, read_ufet_data, co_occurence_lookup, export_result_file
 
 
 class GDConcept:
@@ -54,7 +55,7 @@ class GDConcept:
 
     # get sum of feature function
     def _get_sum_of_feature(self, seq, cliques):
-        print('getting sum of features')
+        # print('getting sum of features')
         sum_f = csc_matrix((self.concept_num, 1))
         for clique in cliques:
             if len(clique) == 1: continue
@@ -84,14 +85,13 @@ class GDConcept:
 
     # get cliques in sequence
     def _clique_detection(self, seq):
-        print('detecting cliques...')
         G = nx.Graph()
         G.add_nodes_from(range(seq.shape[0]))
         for comb in itertools.combinations(range(seq.shape[0]), 2):
             cos = cosine_similarity(seq[comb[0]].reshape(1, -1), seq[comb[1]].reshape(1, -1))
             if cos > self.tolerence:
                 G.add_edge(comb, 1)
-        print('nx finding cliques')
+        # print('nx finding cliques')
         cliques = nx.find_cliques(G)
 
         return cliques
@@ -99,6 +99,7 @@ class GDConcept:
     def inference(self, input_data, result_path):
         clique_list = []
         sum_f_list = []
+        print('detecting cliques...')
         for idx, seq in enumerate(tqdm(input_data)):
             seq_cliques = self._clique_detection(seq)
             sum_f = self._get_sum_of_feature(seq, seq_cliques)
@@ -126,24 +127,30 @@ def run():
     alpha = np.full((concept_num, 1), 1)
     # alpha = csc_matrix((concept_num, 1))
     # alpha = None
-    test_data = '/home/data/cleeag/conceptualization/test_data.txt'
+    # test_data = '/home/data/cleeag/conceptualization/test_data.txt'
+    test_data = '/home/data/cleeag/ufet_crowd/dev.json'
     raw_file_dir_path = '/home/data/cleeag/conceptualization/short-text-conceptualization'
     co_matrix_path = '/home/data/cleeag/conceptualization/co_matrix.pkl'
     inst2idx_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict.pkl'
     idx2concept_dict_path = '/home/data/cleeag/conceptualization/idx2concept_dict.pkl'
-    C_result_path = '/home/data/cleeag/conceptualization/C.pkl'
-    result_path = '/home/data/cleeag/conceptualization/result.txt'
+    C_result_path = '/home/data/cleeag/conceptualization/result/C.pkl'
+    result_path = '/home/data/cleeag/conceptualization/result/result.txt'
 
-    raw_data = read_data(test_data)
-    input_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
-                                                       raw_file_dir_path=raw_file_dir_path,
-                                                       co_matrix_path=co_matrix_path,
-                                                       inst2idx_dict_path=inst2idx_dict_path,
-                                                       idx2concept_dict_path=idx2concept_dict_path)
+    tic = time.time()
+    # raw_data = read_data(test_data)
+    raw_data = read_ufet_data(test_data)
+    input_data, term_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
+                                                                  raw_file_dir_path=raw_file_dir_path,
+                                                                  co_matrix_path=co_matrix_path,
+                                                                  inst2idx_dict_path=inst2idx_dict_path,
+                                                                  idx2concept_dict_path=idx2concept_dict_path)
 
     model = GDConcept(tolerence, concept_num, alpha=alpha)
     C = model.inference(input_data, C_result_path)
-    export_result_file(raw_data, idx2concept_dict, C_result_path, result_path)
+    export_result_file(raw_data, term_data, idx2concept_dict, C_result_path, result_path)
+    toc = time.time()
+
+    print(f'total run-time: {toc - tic:.1f}s')
 
 
 if __name__ == '__main__':
