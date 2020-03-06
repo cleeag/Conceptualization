@@ -10,6 +10,8 @@ import json
 
 import inflect
 
+from metrics import macrof1, microf1
+
 black_list = ['it', 'hi', 'a', 'the', 'wa']
 
 
@@ -26,12 +28,13 @@ def read_ufet_data(path):
     with open(path, 'r') as r:
         count = 0
         for i, line in enumerate(r):
-            if count >= 100: break
+            # if count >= 100: break
             example = json.loads(line.strip())
             # line = example['left_context_token'] + example['mention_span'].split() + example['right_context_token']
             line = example['mention_span'].split()
+            annot_id = example['annot_id']
             if len(line) > 0:
-                data.append(line)
+                data.append((annot_id, line))
                 count += 1
     return data
 
@@ -40,21 +43,53 @@ def export_result_file(raw_data, term_data, idx2concept_dict, result_path, outpu
     C = pkl.load(file=open(result_path, 'rb'))
     with open(output_path, 'w') as w:
         for idx, c_opt in enumerate(C):
-            top_3 = c_opt.flatten().argsort()[-5:][::-1]
+            top_5 = c_opt.toarray().flatten().argsort()[-5:][::-1]
             print(idx)
             print(raw_data[idx])
             print(term_data[idx])
-            w.write(f'({str(idx)})   {raw_data[idx]}    {term_data[idx]}\n')
-            for x in top_3:
+            w.write(f'({str(idx)})\n')
+            w.write(f'{raw_data[idx]}\n')
+            w.write(f'{term_data[idx]}\n')
+            for x in top_5:
                 w.write('\t'.join([str(x), str(c_opt[x]), idx2concept_dict[x]]) + '\n')
                 print(x, c_opt[x], idx2concept_dict[x])
             print()
             w.write('\n')
 
 
+def calculate_f1(C_path, idx2concept_dict_path, annot_ids_path, ufet_path):
+
+    C = pkl.load(file=open(C_path, 'rb'))
+    idx2concept_dict = pkl.load(file=open(idx2concept_dict_path, 'rb'))
+    annot_ids = pkl.load(file=open(annot_ids_path, 'rb'))
+    pred_dict = {}
+    # C = C[:3]
+    # print(C.shape)
+    for idx, c_opt in tqdm(enumerate(C)):
+        top_5 = c_opt.toarray().flatten().argsort()[-5:][::-1]
+        top_5_concept = [idx2concept_dict[x] for x in top_5]
+        pred_dict[annot_ids[idx]] = top_5_concept
+
+    ufet_dict = {}
+    with open(ufet_path, 'r') as r:
+        for line in r:
+            example = json.loads(line.strip())
+            annot_id = example['annot_id']
+            if annot_id not in pred_dict: continue
+            ans = example['y_str']
+            ufet_dict[annot_id] = ans
+    print(len(pred_dict), len(ufet_dict))
+    maf1 = macrof1(ufet_dict, pred_dict, return_pnr=False)
+    mif1 = microf1(ufet_dict, pred_dict)
+
+    print(maf1, mif1)
+    return maf1, mif1
+
+
 def co_occurence_lookup(data,
                         concept_num,
                         instance_num,
+                        annot_ids_path,
                         one_word_per_term=False,
                         clean_word=True,
                         raw_file_dir_path='',
@@ -105,9 +140,9 @@ def co_occurence_lookup(data,
         print('loading idx2concept_dict...')
         idx2concept_dict = pkl.load(file=open(idx2concept_dict_path, 'rb'))
 
-    vec_data, term_data, sent_data = [], [], []
+    vec_data, term_data, sent_data, annot_ids = [], [], [], []
     p = inflect.engine()
-    for line in data:
+    for (annot_id, line) in tqdm(data):
         tmp = []
         term_tmp = []
         if clean_word:
@@ -143,7 +178,7 @@ def co_occurence_lookup(data,
                     elif len(candidate_dict) > 0:
                         term = candidate_dict[max_len]
                         idx = inst2idx_dict[word][term]
-                        print(idx, term, line)
+                        # print(idx, term, line)
                         occ_vec = csc_matrix(co_matrix[:, idx].sum(axis=1).T)
                         # tmp.append([co_matrix[:, idx].T])
                         tmp.append([occ_vec])
@@ -156,8 +191,10 @@ def co_occurence_lookup(data,
             vec_data.append(tmp)
             sent_data.append(line)
             term_data.append(term_tmp)
-
-    return vec_data, sent_data, term_data, idx2concept_dict
+            annot_ids.append(annot_id)
+            # print(sent_data, term_data)
+    pkl.dump(annot_ids, file=open(annot_ids_path, 'wb'))
+    return vec_data, sent_data, term_data, annot_ids, idx2concept_dict
 
 
 
@@ -168,12 +205,18 @@ if __name__ == '__main__':
     # inst2idx_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict.pkl'
     inst2idx_simple_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict-simple.pkl'
     idx2concept_dict_path = '/home/data/cleeag/conceptualization/idx2concept_dict.pkl'
+    C_result_path = '/home/data/cleeag/conceptualization/result/C.pkl'
+    annot_ids_path = '/home/data/cleeag/conceptualization/result/annot_id.pkl'
+    ufet_path = '/home/data/cleeag/ufet_crowd/dev.json'
+
     concept_num = 2359855
     instance_num = 6215859
 
+    calculate_f1(C_result_path, idx2concept_dict_path, annot_ids_path, ufet_path)
+    sys.exit()
     raw_data = read_data(test_data)
-    vec_data, sent_data, term_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
+    vec_data, sent_data, term_data, annot_ids, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
                                                                            raw_file_dir_path=raw_file_dir_path,
                                                                            co_matrix_path=co_matrix_path,
-                                                                           inst2idx_dict_path=inst2idx_dict_path,
+                                                                           inst2idx_dict_path=inst2idx_simple_dict_path,
                                                                            idx2concept_dict_path=idx2concept_dict_path)

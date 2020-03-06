@@ -2,7 +2,7 @@ import os
 from os.path import join
 import itertools
 import pickle as pkl
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, bmat
 from tqdm import tqdm
 import numpy as np
 import scipy
@@ -114,7 +114,8 @@ class GDConcept:
         C = []
         for idx, seq in enumerate(tqdm(input_data)):
             c_opt = self._inference_C(sum_f_list[idx])
-            C.append(c_opt)
+            C.append(csc_matrix(c_opt))
+        # C = bmat(C, format='csc')
         pkl.dump(C, file=open(result_path, 'wb'))
         return C
 
@@ -133,18 +134,20 @@ def run():
     co_matrix_path = '/home/data/cleeag/conceptualization/co_matrix.pkl'
     inst2idx_dict_path = '/home/data/cleeag/conceptualization/inst2idx_dict.pkl'
     idx2concept_dict_path = '/home/data/cleeag/conceptualization/idx2concept_dict.pkl'
+
+    annot_ids_path = '/home/data/cleeag/conceptualization/result/annot_id.pkl'
     C_result_path = '/home/data/cleeag/conceptualization/result/C.pkl'
     result_path = '/home/data/cleeag/conceptualization/result/result.txt'
 
     tic = time.time()
     # raw_data = read_data(test_data)
     raw_data = read_ufet_data(test_data)
-    input_data, sent_data, term_data, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
-                                                                  raw_file_dir_path=raw_file_dir_path,
-                                                                  co_matrix_path=co_matrix_path,
-                                                                  inst2idx_dict_path=inst2idx_dict_path,
-                                                                  idx2concept_dict_path=idx2concept_dict_path)
-
+    input_data, sent_data, term_data, annot_ids, idx2concept_dict = co_occurence_lookup(raw_data, concept_num,
+                                                                                        instance_num, annot_ids_path,
+                                                                                        raw_file_dir_path=raw_file_dir_path,
+                                                                                        co_matrix_path=co_matrix_path,
+                                                                                        inst2idx_dict_path=inst2idx_dict_path,
+                                                                                        idx2concept_dict_path=idx2concept_dict_path)
     model = GDConcept(tolerence, concept_num, alpha=alpha)
     C = model.inference(input_data, C_result_path)
     export_result_file(sent_data, term_data, idx2concept_dict, C_result_path, result_path)
