@@ -12,7 +12,7 @@ import inflect
 
 from metrics import macrof1, microf1
 
-black_list = ['it', 'hi', 'a', 'the', 'wa']
+black_list = ['it', 'hi', 'a', 'the', 'wa', 'thi', 'i', 'she', 'them', 'we', 'us']
 
 
 def read_data(path):
@@ -24,22 +24,24 @@ def read_data(path):
 
 
 def read_ufet_data(path):
-    data = []
+    json_data = []
+    raw_data = []
     with open(path, 'r') as r:
         count = 0
         for i, line in enumerate(r):
-            # if count >= 100: break
+            if count >= 100: break
             example = json.loads(line.strip())
+            json_data.append(example)
             # line = example['left_context_token'] + example['mention_span'].split() + example['right_context_token']
             line = example['mention_span'].split()
             annot_id = example['annot_id']
             if len(line) > 0:
-                data.append((annot_id, line))
+                raw_data.append((annot_id, line))
                 count += 1
-    return data
+    return json_data, raw_data
 
 
-def export_result_file(raw_data, term_data, idx2concept_dict, result_path, output_path):
+def export_result_file(raw_data, term_data, annot_ids, idx2concept_dict, result_path, output_path):
     C = pkl.load(file=open(result_path, 'rb'))
     with open(output_path, 'w') as w:
         for idx, c_opt in enumerate(C):
@@ -48,6 +50,7 @@ def export_result_file(raw_data, term_data, idx2concept_dict, result_path, outpu
             print(raw_data[idx])
             print(term_data[idx])
             w.write(f'({str(idx)})\n')
+            w.write(f'({annot_ids})\n')
             w.write(f'{raw_data[idx]}\n')
             w.write(f'{term_data[idx]}\n')
             for x in top_5:
@@ -58,7 +61,6 @@ def export_result_file(raw_data, term_data, idx2concept_dict, result_path, outpu
 
 
 def calculate_f1(C_path, idx2concept_dict_path, annot_ids_path, ufet_path):
-
     C = pkl.load(file=open(C_path, 'rb'))
     idx2concept_dict = pkl.load(file=open(idx2concept_dict_path, 'rb'))
     annot_ids = pkl.load(file=open(annot_ids_path, 'rb'))
@@ -197,7 +199,6 @@ def co_occurence_lookup(data,
     return vec_data, sent_data, term_data, annot_ids, idx2concept_dict
 
 
-
 if __name__ == '__main__':
     test_data = '/home/data/cleeag/conceptualization/test_data.txt'
     raw_file_dir_path = '/home/data/cleeag/conceptualization/short-text-conceptualization'
@@ -215,8 +216,9 @@ if __name__ == '__main__':
     calculate_f1(C_result_path, idx2concept_dict_path, annot_ids_path, ufet_path)
     sys.exit()
     raw_data = read_data(test_data)
-    vec_data, sent_data, term_data, annot_ids, idx2concept_dict = co_occurence_lookup(raw_data, concept_num, instance_num,
-                                                                           raw_file_dir_path=raw_file_dir_path,
-                                                                           co_matrix_path=co_matrix_path,
-                                                                           inst2idx_dict_path=inst2idx_simple_dict_path,
-                                                                           idx2concept_dict_path=idx2concept_dict_path)
+    vec_data, sent_data, term_data, annot_ids, idx2concept_dict = co_occurence_lookup(raw_data, concept_num,
+                                                                                      instance_num, annot_ids_path,
+                                                                                      raw_file_dir_path=raw_file_dir_path,
+                                                                                      co_matrix_path=co_matrix_path,
+                                                                                      inst2idx_dict_path=inst2idx_simple_dict_path,
+                                                                                      idx2concept_dict_path=idx2concept_dict_path)

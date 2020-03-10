@@ -26,8 +26,8 @@ def instance2concept_lookup(raw_file_dir_path='',
 
     print('loading inst2idx_dict...')
     inst2idx_dict = {}
-    # if not os.path.exists(inst2idx_dict_path):
-    if True:
+    if not os.path.exists(inst2idx_dict_path):
+    # if True:
         with open(join(raw_file_dir_path, 'instanceFile'), 'r') as r:
             for i, line in enumerate(tqdm(r)):
                 # instance, idx = line.lower().split('\t')
